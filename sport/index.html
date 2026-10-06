@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kuntoiluäpit">
+<meta name="theme-color" content="#FFF3D1">
+<title>Urheiluappit</title>
+<style>
+:root{--bg:#FFF3D1;--sun:#FFC83D;--orange:#FF8A1F;--coral:#FF6B57;--ink:#14284B}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--ink);font-family:ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"Segoe UI",sans-serif;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+main{max-width:520px;margin:0 auto;padding:24px 20px 40px}
+header{display:flex;align-items:center;gap:16px;margin-bottom:8px}
+.sun{flex:none;width:64px;height:64px;border-radius:50%;background:var(--orange);box-shadow:0 0 0 10px var(--sun)}
+h1{font-size:40px;line-height:1.05;margin:0;font-weight:900;letter-spacing:-.5px}
+.lead{font-size:18px;line-height:1.4;margin:12px 0 24px;opacity:.75}
+#list{display:flex;flex-direction:column;gap:14px;padding:0;margin:0;list-style:none}
+a.app{display:flex;align-items:center;gap:16px;padding:20px;border-radius:32px;text-decoration:none;color:var(--ink);background:var(--sun)}
+a.app:active{transform:scale(.98)}
+li:nth-child(3n+2) a.app{background:var(--orange)}
+li:nth-child(3n) a.app{background:var(--coral)}
+.ico{flex:none;width:60px;height:60px;border-radius:20px;background:rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;font-size:32px}
+.txt{flex:1;min-width:0}
+.nimi{font-size:22px;font-weight:800;line-height:1.2}
+.kuv{font-size:16px;line-height:1.35;margin-top:2px}
+.tag{display:inline-block;margin-top:8px;padding:3px 12px;border-radius:14px;background:#fff;font-size:14px;font-weight:800}
+.soon{opacity:.55;pointer-events:none}
+:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
+.empty{font-size:18px}
+</style>
+</head>
+<body>
+<main>
+<header><div class="sun" aria-hidden="true"></div><h1>Urheiluappit</h1></header>
+<p class="lead">Treenisovelluksia</p>
+<ul id="list"></ul>
+</main>
+
+<script>
+/* ============================================================
+   LISÄÄ UUSI ÄPPI: kopioi yksi rivi alta, muuta tiedot ja tallenna.
+   nimi       = otsikko
+   kuvaus     = lyhyt selitys
+   linkki     = tiedoston nimi tai osoite (esim. "Aamutreeni_V2.html")
+   emoji      = kuvake
+   laji       = pieni tunniste kortissa (voi jättää tyhjäksi "")
+   tulossa    = true, jos äppi ei ole vielä valmis (kortti himmennetään)
+   Järjestys sivulla = järjestys tässä listassa.
+   ============================================================ */
+const APPIT = [
+  { nimi: "Aamutreeni", kuvaus: "Kotitreeni käsipainoilla: Treeni A ja B, palautusajastin.", linkki: "aamupuntti.html", emoji: "💪", laji: "Kuntoilu" },
+ 
+];
+/* ============================================================ */
+
+const lista = document.getElementById("list");
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+lista.innerHTML = APPIT.length ? APPIT.map(a =>
+  '<li><a class="app' + (a.tulossa ? " soon" : "") + '" href="' + esc(a.linkki) + '"' + (a.tulossa ? ' aria-disabled="true" tabindex="-1"' : "") + '>' +
+  '<div class="ico" aria-hidden="true">' + esc(a.emoji || "🏅") + '</div>' +
+  '<div class="txt"><div class="nimi">' + esc(a.nimi) + '</div><div class="kuv">' + esc(a.kuvaus) + '</div>' +
+  (a.tulossa ? '<span class="tag">Tulossa</span>' : a.laji ? '<span class="tag">' + esc(a.laji) + '</span>' : "") +
+  '</div></a></li>').join("") : '<li class="empty">Ei vielä appeja. Lisää ensimmäinen listaan.</li>';
+
+try{const c=document.createElement("canvas");c.width=c.height=180;const x=c.getContext("2d");x.fillStyle="#FFC83D";x.fillRect(0,0,180,180);x.fillStyle="#FF8A1F";x.beginPath();x.arc(90,90,48,0,7);x.fill();x.strokeStyle="#FF6B57";x.lineWidth=10;x.lineCap="round";for(let i=0;i<8;i++){const a=i*Math.PI/4;x.beginPath();x.moveTo(90+64*Math.cos(a),90+64*Math.sin(a));x.lineTo(90+78*Math.cos(a),90+78*Math.sin(a));x.stroke()}const l=document.createElement("link");l.rel="apple-touch-icon";l.href=c.toDataURL("image/png");document.head.appendChild(l)}catch(e){}
+</script>
+</body>
+</html>
