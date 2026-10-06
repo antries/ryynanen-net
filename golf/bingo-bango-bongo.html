@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#125c36">
+<title>Bingo–Bango–Bongo</title>
+<style>
+:root{--green:#125c36;--green2:#21824c;--bg:#edf3ef;--card:#fff;--text:#17231b;--muted:#657268;--line:#dfe8e1;--red:#b42318;--gold:#f3b61f}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+header{position:sticky;top:0;z-index:5;background:var(--green);color:#fff;padding:calc(13px + env(safe-area-inset-top)) 16px 13px;box-shadow:0 2px 8px #0002}
+header h1{margin:0;font-size:20px}.wrap{max-width:620px;margin:auto;padding:12px}.card{background:var(--card);border-radius:17px;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px #12351d16}
+h2,h3,p{margin-top:0}.muted{color:var(--muted);font-size:14px}.field{margin:10px 0}.field label{display:block;font-weight:750;font-size:14px;margin-bottom:5px}.field input{width:100%;padding:14px;border:1px solid #bccac0;border-radius:11px;font-size:17px;background:#fff;color:var(--text)}
+.btn{border:0;border-radius:12px;padding:14px;font-size:17px;font-weight:800;background:#dfe9e2;color:var(--text);touch-action:manipulation}.primary{width:100%;background:var(--green);color:#fff}.secondary{width:100%;margin-top:8px}.danger{width:100%;margin-top:8px;background:#fff0ef;color:var(--red)}
+.headline{display:flex;align-items:center;justify-content:space-between;gap:12px}.headline h2{margin:0}.hole-pot{font-weight:850;color:var(--green)}
+.players{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:9px}.player{text-align:center;min-width:0;background:#f7f7f2;border-radius:14px;padding:10px 3px}.name{height:42px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:850;overflow:hidden;word-break:break-word}.score{font-size:48px;font-weight:900;line-height:1.1;margin:8px 0;color:#755300}.step{width:58px;max-width:92%;height:52px;border:0;border-radius:12px;font-size:30px;font-weight:900;background:#e5e8df;color:var(--text);touch-action:manipulation}.step.plus{background:var(--gold);color:#302509}
+.sum{padding:12px;border-radius:12px;text-align:center;font-size:17px;font-weight:850;margin-bottom:10px}.sum.ok{background:#e8f5ec;color:var(--green)}.sum.bad{background:#fff0ef;color:var(--red)}
+.leader{display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}.leader:last-child{border:0}.pts{font-weight:900}.sub{font-size:12px;color:var(--muted)}
+.last{border-left:5px solid var(--green);background:#eaf5ed}.last-row{display:grid;grid-template-columns:1fr auto;gap:8px;padding-top:6px;font-size:14px}.winner{text-align:center;font-size:25px;font-weight:900;color:var(--green);margin:10px 0}.history-grid{display:grid;grid-template-columns:50px repeat(3,1fr);font-size:13px;text-align:center}.history-grid>div{padding:7px 3px;border-bottom:1px solid var(--line)}.history-grid .head{font-weight:850;background:#f4f7f4}.warning{text-align:center;color:var(--muted);font-size:13px;margin:10px 0 0}
+</style>
+</head>
+<body>
+<header><h1>⛳ Bingo–Bango–Bongo</h1></header>
+<main class="wrap" id="app"></main>
+<script>
+'use strict';
+const KEY='bingo_bango_bongo_offline_v1';
+let game=load();
+function load(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(game))}catch(e){}render()}
+function esc(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function startGame(){const names=[0,1,2].map(i=>document.getElementById('name'+i).value.trim()||`Pelaaja ${i+1}`);game={hole:1,complete:false,players:names.map(name=>({name,total:0,current:0})),results:[]};persist()}
+function changePoint(index,delta){const p=game.players[index];p.current=Math.max(0,Math.min(3,p.current+delta));persist()}
+function pointSum(){return game.players.reduce((sum,p)=>sum+p.current,0)}
+function saveHole(){if(pointSum()!==3){alert('Jaa reiälle yhteensä tasan 3 pistettä.');return}const result={hole:game.hole,points:game.players.map(p=>p.current)};result.points.forEach((points,i)=>game.players[i].total+=points);game.results.push(result);if(game.hole===18){game.complete=true}else{game.hole++;game.players.forEach(p=>p.current=0)}persist()}
+function undoHole(){if(!game.results.length)return;const result=game.results.pop();result.points.forEach((points,i)=>{game.players[i].total-=points;game.players[i].current=points});game.hole=result.hole;game.complete=false;persist()}
+function resetGame(){if(confirm('Nollataanko kilpailu? Kaikki tulokset poistetaan.')){localStorage.removeItem(KEY);game=null;render()}}
+function rank(){return game.players.map((p,index)=>({...p,index})).sort((a,b)=>b.total-a.total||a.index-b.index)}
+function renderHistory(){if(!game.results.length)return '';return `<section class="card"><h3>Reikäkohtaiset pisteet</h3><div class="history-grid"><div class="head">Reikä</div>${game.players.map(p=>`<div class="head">${esc(p.name)}</div>`).join('')}${game.results.map(r=>`<div>${r.hole}</div>${r.points.map(p=>`<div>${p}</div>`).join('')}`).join('')}</div></section>`}
+function render(){const app=document.getElementById('app');if(!game){app.innerHTML=`<section class="card"><h2>Uusi kilpailu</h2><p class="muted">Anna kolmen pelaajan nimet. Jokaisella reiällä jaetaan yhteensä kolme kokonaista pistettä, esimerkiksi 1–1–1, 2–1–0 tai 3–0–0.</p>${[0,1,2].map(i=>`<div class="field"><label>Pelaaja ${i+1}</label><input id="name${i}" maxlength="18" placeholder="Pelaajan nimi" autocomplete="off"></div>`).join('')}<button class="btn primary" onclick="startGame()">Aloita peli</button><p class="warning">Peli tallentuu paikallisesti tälle laitteelle kesken kierroksen.</p></section>`;return}
+const ranking=rank();if(game.complete){const best=ranking[0].total,winners=ranking.filter(p=>p.total===best).map(p=>p.name);app.innerHTML=`<section class="card"><h2 style="text-align:center">Kisa päättynyt</h2><div class="winner">${winners.length>1?'Tasapeli: ':'Voittaja: '}${winners.map(esc).join(' & ')}</div></section><section class="card"><h3>Lopputulos</h3>${ranking.map((p,i)=>`<div class="leader"><b>${i+1}.</b><span>${esc(p.name)}</span><span class="pts">${p.total} p</span></div>`).join('')}</section>${renderHistory()}<button class="btn secondary" onclick="undoHole()">Korjaa reikä 18</button><button class="btn danger" onclick="resetGame()">Nollaa ja aloita uusi kisa</button>`;return}
+const sum=pointSum(),last=game.results.length?game.results[game.results.length-1]:null;app.innerHTML=`<section class="card"><div class="headline"><h2>Reikä ${game.hole} / 18</h2><div class="hole-pot">3 pistettä</div></div></section><section class="card players">${game.players.map((p,i)=>`<div class="player"><div class="name">${esc(p.name)}</div><button class="step" onclick="changePoint(${i},-1)" aria-label="Vähennä piste">−</button><div class="score">${p.current}</div><button class="step plus" onclick="changePoint(${i},1)" aria-label="Lisää piste">+</button></div>`).join('')}</section><div class="sum ${sum===3?'ok':'bad'}">Jaettu ${sum} / 3 pistettä</div><button class="btn primary" onclick="saveHole()">${game.hole===18?'Päätä kilpailu':'Tallenna reikä'}</button>${game.results.length?'<button class="btn secondary" onclick="undoHole()">Peru edellinen reikä</button>':''}<section class="card" style="margin-top:12px"><h3>Tilanne</h3>${ranking.map((p,i)=>`<div class="leader"><b>${i+1}.</b><span>${esc(p.name)}<div class="sub">${game.results.length} reikää pelattu</div></span><span class="pts">${p.total} p</span></div>`).join('')}</section>${last?`<section class="card last"><b>Reikä ${last.hole} tallennettu</b>${game.players.map((p,i)=>`<div class="last-row"><span>${esc(p.name)}</span><b>${last.points[i]} p</b></div>`).join('')}</section>`:''}${renderHistory()}<button class="btn danger" onclick="resetGame()">Nollaa koko kilpailu</button>`}
+render();
+</script>
+</body>
+</html>

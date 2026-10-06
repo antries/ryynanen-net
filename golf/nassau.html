@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#125c36">
+  <title>Nassau Live</title>
+  <style>
+    :root{--green:#125c36;--green2:#21824c;--bg:#edf3ef;--card:#fff;--text:#17231b;--muted:#657268;--line:#dfe8e1;--danger:#b42318}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    body{padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+    header{position:sticky;top:0;z-index:5;background:var(--green);color:#fff;padding:calc(13px + env(safe-area-inset-top)) 16px 13px;box-shadow:0 2px 8px #0002}
+    header h1{margin:0;font-size:21px}.wrap{max-width:620px;margin:auto;padding:12px}.card{background:var(--card);border-radius:17px;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px #12351d16}
+    h2,h3,p{margin-top:0}.muted{color:var(--muted);font-size:14px}.choice{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+    button{font:inherit;touch-action:manipulation}.btn{border:0;border-radius:12px;padding:14px;font-size:17px;font-weight:750;background:#dfe9e2;color:var(--text)}.btn.active,.btn.primary{background:var(--green);color:#fff}.btn.primary{width:100%;font-size:18px}.btn.secondary{width:100%;margin-top:8px}.btn.danger{width:100%;margin-top:8px;background:#fff0ef;color:var(--danger)}
+    .names input{display:block;width:100%;margin:8px 0;padding:14px;border:1px solid #bccac0;border-radius:11px;font-size:17px;background:#fff;color:var(--text)}
+    .headline{display:flex;align-items:center;justify-content:space-between;gap:12px}.headline h2{margin:0}.rule{font-weight:800;text-align:right;font-size:14px;color:var(--green)}
+    .players{display:grid;gap:7px;padding:10px}.player{min-width:0;text-align:center;background:#f5f8f6;border-radius:13px;padding:9px 3px}.pname{height:38px;display:flex;align-items:center;justify-content:center;font-weight:750;font-size:14px;overflow:hidden;word-break:break-word}.score{font-size:42px;line-height:1.15;font-weight:850;margin:6px 0}.step{width:58px;max-width:92%;height:52px;border:0;border-radius:12px;font-size:31px;font-weight:800;background:#dfe8e1;color:var(--text)}.step.plus{background:var(--green2);color:#fff}
+    .leader{display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}.leader:last-child{border-bottom:0}.pts{font-weight:850}.last{border-left:5px solid var(--green);background:#eaf5ed}.last-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;font-size:14px;padding-top:6px}.winner{text-align:center;font-size:25px;font-weight:850;color:var(--green);margin:10px 0}.warning{font-size:13px;color:var(--muted);text-align:center;margin:10px 2px}.error{background:#fff0ef;color:#8a1c14;padding:10px;border-radius:10px;margin-bottom:10px;display:none}
+  </style>
+</head>
+<body>
+<header><h1>⛳ Nassau Live</h1></header>
+<main class="wrap" id="app"></main>
+<script>
+'use strict';
+const STORAGE_KEY='nassau_live_single_file_v1';
+let game=readGame();
+function readGame(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'null')}catch(e){return null}}
+function saveGame(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(game))}catch(e){} render()}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function fmt(x){return Number(x.toFixed(2)).toLocaleString('fi-FI',{maximumFractionDigits:2})}
+function pointsFor(hole,count){if(hole<=12)return count===2?[2,0]:count===3?[2,1,0]:[2,1,0,0];return hole<=15?[3,...Array(count-1).fill(0)]:[5,...Array(count-1).fill(0)]}
+function calculate(scores,hole){const base=pointsFor(hole,scores.length),out=Array(scores.length).fill(0),sorted=scores.map((score,index)=>({score,index})).sort((a,b)=>a.score-b.score);let pos=0;while(pos<sorted.length){let end=pos;while(end+1<sorted.length&&sorted[end+1].score===sorted[pos].score)end++;let pool=0;for(let k=pos;k<=end;k++)pool+=base[k]||0;const share=pool/(end-pos+1);for(let k=pos;k<=end;k++)out[sorted[k].index]=share;pos=end+1}return out}
+function setCount(count){document.querySelectorAll('[data-count]').forEach(b=>b.classList.toggle('active',Number(b.dataset.count)===count));const box=document.getElementById('names');box.dataset.count=count;box.innerHTML=Array.from({length:count},(_,i)=>`<input id="name${i}" maxlength="18" placeholder="Pelaaja ${i+1}" autocomplete="off">`).join('')}
+function startGame(){const box=document.getElementById('names'),count=Number(box.dataset.count),names=Array.from({length:count},(_,i)=>(document.getElementById('name'+i).value.trim()||`Pelaaja ${i+1}`));game={hole:1,complete:false,players:names.map(name=>({name,total:0,score:4})),results:[]};saveGame()}
+function changeScore(index,delta){game.players[index].score=Math.max(1,Math.min(20,game.players[index].score+delta));saveGame()}
+function saveHole(){if(!game||game.complete)return;const scores=game.players.map(p=>p.score),points=calculate(scores,game.hole),entry={hole:game.hole,scores:[...scores],points:[...points]};points.forEach((value,i)=>game.players[i].total+=value);game.results.push(entry);if(game.hole===18)game.complete=true;else{game.hole++;game.players.forEach(p=>p.score=4)}saveGame()}
+function undoHole(){if(!game||!game.results.length)return;const entry=game.results.pop();entry.points.forEach((value,i)=>game.players[i].total-=value);game.hole=entry.hole;game.players.forEach((p,i)=>p.score=entry.scores[i]);game.complete=false;saveGame()}
+function newGame(){if(!game||confirm('Nollataanko nykyinen kisa? Kaikki sen tulokset poistetaan.')){localStorage.removeItem(STORAGE_KEY);game=null;render()}}
+function ranking(){return game.players.map((p,index)=>({...p,index})).sort((a,b)=>b.total-a.total||a.index-b.index)}
+function render(){const app=document.getElementById('app');if(!game){app.innerHTML=`<section class="card"><h2>Uusi kilpailu</h2><p class="muted">Valitse pelaajamäärä ja anna nimet.</p><div class="choice"><button class="btn" data-count="2" onclick="setCount(2)">2</button><button class="btn active" data-count="3" onclick="setCount(3)">3</button><button class="btn" data-count="4" onclick="setCount(4)">4</button></div><div class="names" id="names" data-count="3"></div><button class="btn primary" onclick="startGame()">Aloita peli</button><p class="warning">Tulokset tallentuvat tämän sivun paikalliseen selainmuistiin kierroksen ajaksi.</p></section>`;setCount(3);return}
+const rank=ranking();if(game.complete){const top=rank[0].total,winners=rank.filter(p=>Math.abs(p.total-top)<0.000001).map(p=>p.name);app.innerHTML=`<section class="card"><h2 style="text-align:center">Kisa päättynyt</h2><div class="winner">${winners.length>1?'Tasapeli: ':'Voittaja: '}${winners.map(esc).join(' & ')}</div></section><section class="card"><h3>Lopputulos</h3>${rank.map((p,i)=>`<div class="leader"><b>${i+1}.</b><span>${esc(p.name)}</span><span class="pts">${fmt(p.total)} p</span></div>`).join('')}</section><button class="btn secondary" onclick="undoHole()">Korjaa reikä 18</button><button class="btn danger" onclick="newGame()">Nollaa ja aloita uusi kisa</button>`;return}
+const count=game.players.length,rule=game.hole<=12?pointsFor(game.hole,count).join('–'):game.hole<=15?'Voittajapotti 3 p':'Voittajapotti 5 p',last=game.results.length?game.results[game.results.length-1]:null;
+app.innerHTML=`<section class="card"><div class="headline"><h2>Reikä ${game.hole} / 18</h2><div class="rule">${rule}</div></div></section><section class="card players" style="grid-template-columns:repeat(${count},minmax(0,1fr))">${game.players.map((p,i)=>`<div class="player"><div class="pname">${esc(p.name)}</div><button class="step" onclick="changeScore(${i},-1)" aria-label="Vähennä">−</button><div class="score">${p.score}</div><button class="step plus" onclick="changeScore(${i},1)" aria-label="Lisää">+</button></div>`).join('')}</section><button class="btn primary" onclick="saveHole()">${game.hole===18?'Päätä peli':'Tallenna reikä'}</button>${game.results.length?'<button class="btn secondary" onclick="undoHole()">Peru edellinen reikä</button>':''}<section class="card" style="margin-top:12px"><h3>Tilanne</h3>${rank.map((p,i)=>`<div class="leader"><b>${i+1}.</b><span>${esc(p.name)}</span><span class="pts">${fmt(p.total)} p</span></div>`).join('')}</section>${last?`<section class="card last"><b>Reikä ${last.hole} tallennettu</b>${game.players.map((p,i)=>`<div class="last-row"><span>${esc(p.name)}</span><span>${last.scores[i]} lyöntiä</span><b>${fmt(last.points[i])} p</b></div>`).join('')}</section>`:''}<button class="btn danger" onclick="newGame()">Nollaa ja aloita uusi kisa</button>`}
+render();
+</script>
+</body></html>
