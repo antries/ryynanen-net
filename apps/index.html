@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Äppejä</title>
+<style>
+  :root {
+    --navy: #0a2540;
+    --blue: #1e6bd6;
+    --blue-light: #4a97f0;
+    --pale: #eef5fd;
+    --line: #dce8f7;
+    --text: #12263f;
+    --muted: #6b7f99;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #fff;
+    color: var(--text);
+  }
+
+  /* Yläosa */
+  header {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
+    color: #fff;
+    text-align: center;
+    padding: 3.5rem 1rem 5rem;
+    position: relative;
+  }
+  header h1 {
+    margin: 0;
+    font-size: clamp(2.2rem, 7vw, 3.2rem);
+    font-weight: 800;
+    letter-spacing: .5px;
+  }
+  header p { margin: .6rem 0 0; opacity: .8; font-size: 1rem; }
+  header svg {
+    position: absolute; left: 0; bottom: -1px; width: 100%; height: 40px; display: block;
+  }
+
+  /* Sisältö */
+  main { max-width: 760px; margin: 0 auto; padding: 0 1rem 3rem; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: .5rem;
+  }
+  a.card {
+    display: flex; flex-direction: column; gap: .9rem;
+    padding: 1.25rem;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    text-decoration: none; color: inherit;
+    box-shadow: 0 2px 10px rgba(10, 37, 64, .06);
+    transition: transform .15s, box-shadow .15s, border-color .15s;
+  }
+  a.card:hover, a.card:focus-visible {
+    transform: translateY(-3px);
+    border-color: var(--blue-light);
+    box-shadow: 0 8px 22px rgba(30, 107, 214, .18);
+    outline: none;
+  }
+  .badge {
+    width: 46px; height: 46px; border-radius: 12px;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--blue-light), var(--blue));
+    color: #fff; font-weight: 700; font-size: 1.3rem;
+  }
+  .name { font-weight: 650; font-size: 1.1rem; line-height: 1.25; word-break: break-word; }
+  .open { margin-top: auto; color: var(--blue); font-size: .9rem; font-weight: 600; }
+  .card:hover .open { text-decoration: underline; }
+
+  .msg {
+    text-align: center; color: var(--muted); line-height: 1.6;
+    background: var(--pale); border-radius: 14px; padding: 1.5rem;
+  }
+  code { background: #fff; padding: .1em .4em; border-radius: 4px; border: 1px solid var(--line); }
+  footer { text-align: center; color: var(--muted); font-size: .85rem; padding: 0 1rem 2rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Äppejä</h1>
+  <p id="count"></p>
+  <svg viewBox="0 0 1200 40" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0,40 L0,18 Q300,-10 600,16 T1200,14 L1200,40 Z" fill="#fff"/>
+  </svg>
+</header>
+
+<main>
+  <div class="grid" id="list"></div>
+  <p class="msg" id="msg" hidden></p>
+</main>
+
+<script>
+(async function () {
+  const list = document.getElementById('list');
+  const msg = document.getElementById('msg');
+  const count = document.getElementById('count');
+  const self = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
+
+  // Tiedostot jotka jätetään listalta pois
+  const skip = new Set([self, 'index.html', '404.html']);
+
+  // Kansion automaattilistaus (toimii vain palvelimilla jotka sellaisen tarjoavat)
+  async function fromDirectoryListing() {
+    const res = await fetch('./', { cache: 'no-store' });
+    if (!res.ok) throw new Error('no listing');
+    const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+    const files = [...doc.querySelectorAll('a[href]')]
+      .map(a => decodeURIComponent(a.getAttribute('href').split('?')[0].split('#')[0]))
+      .filter(h => /\.html?$/i.test(h) && !h.includes('/') && !h.startsWith('.'));
+    if (!files.length) throw new Error('empty');
+    return files;
+  }
+
+  // apps.json (luodaan skriptillä generate-apps.js)
+  async function fromManifest() {
+    const res = await fetch('apps.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('no manifest');
+    return await res.json();
+  }
+
+  let files = [];
+  try { files = await fromManifest(); }
+  catch (e) { try { files = await fromDirectoryListing(); } catch (e2) { files = []; } }
+
+  files = [...new Set(files)]
+    .filter(f => !skip.has(f.toLowerCase()))
+    .sort((a, b) => a.localeCompare(b, 'fi', { numeric: true, sensitivity: 'base' }));
+
+  if (!files.length) {
+    msg.hidden = false;
+    msg.innerHTML = 'Ei vielä äppejä.<br>Lisää .html-tiedostoja tähän kansioon ja päivitä <code>apps.json</code>.';
+    return;
+  }
+
+  count.textContent = files.length === 1 ? '1 sovellus' : files.length + ' sovellusta';
+
+  for (const f of files) {
+    let name = f.replace(/\.html?$/i, '').replace(/[_-]+/g, ' ').trim();
+    name = name.charAt(0).toUpperCase() + name.slice(1);
+
+    const a = document.createElement('a');
+    a.className = 'card';
+    a.href = encodeURI(f);
+
+    const badge = document.createElement('div');
+    badge.className = 'badge';
+    badge.textContent = name.charAt(0).toUpperCase();
+
+    const title = document.createElement('div');
+    title.className = 'name';
+    title.textContent = name;
+
+    const open = document.createElement('div');
+    open.className = 'open';
+    open.textContent = 'Avaa →';
+
+    a.append(badge, title, open);
+    list.appendChild(a);
+  }
+})();
+</script>
+</body>
+</html>
