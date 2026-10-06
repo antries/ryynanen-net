@@ -1,119 +1,114 @@
 <!DOCTYPE html>
 <html lang="fi">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Ryynänen Golf Apps</title>
-
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Golf-pelejä</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-body{
-    margin:0;
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-    background:#0f172a;
-    color:white;
+:root{
+  --night:#0a211a; --deep:#0f3027; --panel:#14392e; --line:#2a5a49;
+  --fairway:#3aa266; --sand:#ecd9a6; --mist:#cfe5dc; --flag:#ff6b3d; --white:#f5faf7;
+  --serif:"Fraunces",Georgia,serif; --sans:"Outfit",system-ui,-apple-system,"Segoe UI",sans-serif;
 }
+*{box-sizing:border-box;margin:0}
+html{background:var(--night);color:var(--white);font-family:var(--sans);-webkit-text-size-adjust:100%}
+body{min-height:100vh;padding:0 1.25rem calc(env(safe-area-inset-bottom,0px) + 3rem)}
 
-.hero{
-    padding:50px 20px;
-    text-align:center;
-    background:linear-gradient(135deg,#15803d,#0f172a);
-}
+/* Hero */
+.hero{max-width:64rem;margin:0 auto;padding:calc(env(safe-area-inset-top,0px) + 3.5rem) 0 2rem;
+  display:grid;grid-template-columns:1fr auto;align-items:end;gap:1rem}
+.hero h1{font-family:var(--serif);font-weight:800;font-size:clamp(3rem,13vw,7rem);line-height:1;letter-spacing:-.02em}
+.pin{width:clamp(4.5rem,16vw,8rem);height:auto}
+.flag{transform-origin:0 0;animation:wave 3.2s ease-in-out infinite}
+@keyframes wave{0%,100%{transform:skewY(0) scaleX(1)}50%{transform:skewY(-6deg) scaleX(.92)}}
 
-.hero h1{
-    margin:0;
-    font-size:2.2rem;
-}
+/* Fairway strip */
+.strip{max-width:64rem;margin:0 auto 2rem;height:10px;border-radius:99px;
+  background:repeating-linear-gradient(90deg,var(--fairway) 0 3rem,#2f8a55 3rem 6rem)}
 
-.hero p{
-    color:#d1d5db;
-    margin-top:10px;
-}
+/* App cards */
+.grid{max-width:64rem;margin:0 auto;display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(17rem,1fr))}
+.card{--accent:var(--flag);position:relative;display:flex;flex-direction:column;gap:.6rem;min-height:13rem;
+  padding:1.5rem;color:var(--white);text-decoration:none;background:var(--panel);
+  border:1px solid var(--line);border-radius:1.5rem;overflow:hidden;
+  transition:transform .18s ease,border-color .18s ease,background .18s ease}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--accent)}
+.card:hover{transform:translateY(-4px);border-color:var(--accent);background:#184336}
+.card:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.icon{width:3.2rem;height:3.2rem;border-radius:1rem;display:grid;place-items:center;
+  background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--accent)}
+.icon svg{width:1.9rem;height:1.9rem}
+.tag{position:absolute;top:1.5rem;right:1.4rem;font-size:.85rem;font-weight:500;color:var(--mist);
+  padding:.2rem .7rem;border:1px solid var(--line);border-radius:99px}
+.card h2{margin-top:.4rem;font-family:var(--serif);font-weight:700;font-size:1.65rem;line-height:1.1}
+.card p{font-size:1rem;line-height:1.5;color:var(--mist)}
+.go{margin-top:auto;padding-top:.5rem;display:flex;align-items:center;gap:.5rem;font-weight:600;color:var(--accent)}
+.go svg{width:1.2rem;height:1.2rem;transition:transform .18s}
+.card:hover .go svg{transform:translateX(4px)}
 
-.container{
-    max-width:1000px;
-    margin:auto;
-    padding:25px;
-}
-
-.grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
-    gap:20px;
-}
-
-.card{
-    background:#1e293b;
-    border-radius:16px;
-    padding:22px;
-    text-decoration:none;
-    color:white;
-    transition:0.2s;
-    border:1px solid rgba(255,255,255,0.08);
-}
-
-.card:hover{
-    transform:translateY(-4px);
-    background:#334155;
-}
-
-.card h2{
-    margin-top:0;
-}
-
-.badge{
-    display:inline-block;
-    background:#15803d;
-    padding:5px 10px;
-    border-radius:999px;
-    font-size:0.8rem;
-    margin-bottom:12px;
-}
-
-.footer{
-    text-align:center;
-    color:#94a3b8;
-    padding:40px 20px;
-}
+@media (max-width:30rem){.hero{grid-template-columns:1fr}.pin{display:none}}
+@media (prefers-reduced-motion:reduce){.flag{animation:none}.card,.go svg{transition:none}}
 </style>
 </head>
-
 <body>
 
-<div class="hero">
-    <h1>🏌️ Ryynänen Golf Apps</h1>
-    <p>Golfreissujen, kisojen ja pelimuotojen työkalut</p>
-</div>
+<header class="hero">
+  <div>
+    <h1>Golf-pelejä</h1>
+  </div>
+  <svg class="pin" viewBox="0 0 80 130" aria-hidden="true">
+    <ellipse cx="22" cy="122" rx="20" ry="6" fill="#3aa266"/>
+    <line x1="22" y1="122" x2="22" y2="8" stroke="#f5faf7" stroke-width="3" stroke-linecap="round"/>
+    <g class="flag"><path d="M24 8 L74 24 L24 40Z" fill="#ff6b3d"/></g>
+  </svg>
+</header>
+<div class="strip" aria-hidden="true"></div>
 
-<div class="container">
+<main class="grid" id="apps"></main>
 
-    <div class="grid">
+<script>
+/* ============================================================
+   UUDEN PELIN LISÄÄMINEN
+   1. Lisää pelin html-tiedosto samaan kansioon kuin tämä sivu.
+   2. Kopioi alla oleva rivi ja muokkaa sen tiedot:
+      { file:"uusi-peli.html", title:"Otsikko", desc:"Lyhyt kuvaus.", tag:"Ryhmä", icon:"flag", color:"#ff6b3d" },
+   Kuvakkeet: trophy, bird, target, flag, ball, cards, chart, people
+   Väri on valinnainen. Jos jätät sen pois, väri valitaan automaattisesti.
+   ============================================================ */
+const APPS = [
+  { file:"nassau.html",           title:"Nassau Live",       desc:"Seuraa Nassau-pelin tilannetta reiältä reiälle.", tag:"Nassau",   icon:"trophy" },
+  { file:"birkkujahti.html",      title:"Birkkujahti",       desc:"Laske birdiet ja seuraa kauden tilastoja.",       tag:"Birdiet",  icon:"bird" },
+  { file:"bingo-bango-bongo.html",title:"Bingo Bango Bongo", desc:"Pisteiden laskenta Bingo Bango Bongo -pelimuotoon.", tag:"Pelikisa", icon:"target" },
+];
 
-        <a classtml
-            <div class="badge">Nassau</div>
-            <h2>🏆 Nassau Live</h2>
-            <p>Seuraa Nassau-pelin tilannetta reiältä reiälle.</p>
-        </a>
+const ICONS = {
+  trophy:'<path d="M8 4h8v5a4 4 0 0 1-8 0V4Z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M10 17h4"/>',
+  bird:'<path d="M3 14c3-6 8-8 13-6l5-2-2 4c0 6-5 10-11 10-2 0-4-1-5-3"/><circle cx="15.5" cy="9.5" r=".6" fill="currentColor"/>',
+  target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1" fill="currentColor"/>',
+  flag:'<path d="M6 21V4M6 4l12 4-12 5"/>',
+  ball:'<circle cx="12" cy="12" r="9"/><circle cx="9" cy="10" r=".8" fill="currentColor"/><circle cx="13" cy="8.5" r=".8" fill="currentColor"/><circle cx="15" cy="12.5" r=".8" fill="currentColor"/><circle cx="10.5" cy="14.5" r=".8" fill="currentColor"/>',
+  cards:'<rect x="4" y="5" width="11" height="15" rx="2"/><path d="M9 5l1-1.5a2 2 0 0 1 2.7-.5l6.3 3.6a2 2 0 0 1 .8 2.7L16 19"/>',
+  chart:'<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
+  people:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M17 14c2.5 0 4.5 1.8 4.5 4.5"/>'
+};
+const COLORS = ["#ff6b3d","#ecd9a6","#6fd0e0","#a5e36a","#f4a6c8"];
+const ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 
-        <a classhti.html
-            <div class="badge">Birdiet</div>
-            <h2>🐦 Birkkujahti</h2>
-            <p>Laske birdiet ja seuraa kauden tilastoja.</p>
-        </a>
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-        bingo-bango-bongo.html
-            <div class="badge">Pelikisa</div>
-            <h2>🎯 Bingo Bango Bongo</h2>
-            <p>Pisteiden laskenta Bingo Bango Bongo -pelimuotoon.</p>
-        </a>
-
-    </div>
-
-</div>
-
-<div class="footer">
-    Ryynanen.net • Golf Apps
-</div>
-
+document.getElementById("apps").innerHTML = APPS.map((a, i) => `
+  <a class="card" href="${esc(a.file)}" style="--accent:${esc(a.color || COLORS[i % COLORS.length])}">
+    ${a.tag ? `<span class="tag">${esc(a.tag)}</span>` : ""}
+    <span class="icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[a.icon] || ICONS.flag}</svg>
+    </span>
+    <h2>${esc(a.title)}</h2>
+    <p>${esc(a.desc)}</p>
+    <span class="go">Avaa ${ARROW}</span>
+  </a>`).join("");
+</script>
 </body>
 </html>
