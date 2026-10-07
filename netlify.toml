@@ -1,2 +1,2 @@
 [build]
-  command = "node apps/generate-apps.js"
+  command = "node apps/generate-apps.js && node golf/generate-apps.js"
