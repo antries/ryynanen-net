@@ -136,21 +136,6 @@ async function naficon() {
   return { label, days, url: B + '/leagues/naficon-liiga' };
 }
 
-// ---------- pelaajahaku: ratings-sivun sivutus ----------
-async function players(q) {
-  const s = q.toLowerCase().trim();
-  if (s.length < 3) return { players: [] };
-  const out = [];
-  const pages = Array.from({ length: 12 }, (_, i) => i + 1);
-  await Promise.all(pages.map(async (n) => {
-    try {
-      const h = await get(`${B}/ratings?page=${n}`, 6 * 36e5);
-      anchors(h).filter((a) => /\/users\/[^/]+\.\d+$/.test(a.u) && a.t).forEach((a) => { if (a.t.toLowerCase().includes(s)) out.push({ name: a.t, url: abs(a.u) }); });
-    } catch {}
-  }));
-  return { players: [...new Map(out.map((p) => [p.url, p])).values()].slice(0, 20) };
-}
-
 // ---------- kaavio: seuraava ottelu, voitto- ja häviöpolku ----------
 function parseBracket(h) {
   const m = h.replace(/<a[^>]+href="[^"]*\/users\/[^"]*\.(\d+)[^"]*"[^>]*>([\s\S]*?)<\/a>/g, (_, id, t) => `\n@@${id}@@${flat(t)}\n`);
@@ -288,7 +273,6 @@ export default async (req) => {
       d = { teams: s ? (await teamIndex()).filter((t) => t.name.toLowerCase().includes(s)).slice(0, 30) : [] };
     } else if (v === 'halli') d = await halli(q.get('n') || '');
     else if (v === 'naficon') d = await naficon();
-    else if (v === 'players') d = await players(q.get('q') || '');
     else throw new Error('Tuntematon näkymä');
     if (typeof d === 'string') return new Response(d, { headers: { 'content-type': 'text/plain; charset=utf-8' } });
     return json(d);
