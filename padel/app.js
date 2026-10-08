@@ -36,15 +36,11 @@ function search(m, ph) {
     if (e.key !== 'Enter') return;
     const v = i.value.trim(); if (!v) return;
     if (/\/rosters\/\d+$/.test(v)) { location.href = 'sarjapadel.html?team=' + encodeURIComponent(v); return; }
-    if (/^(https?:\/\/|\d+$)/.test(v)) { LS.padelP = v; location.href = 'index.html'; return; }
-    res.replaceChildren(el('div', 'c sm', 'Haetaan…'));
+    res.replaceChildren(el('div', 'c sm', 'Haetaan joukkueita…'));
     try {
-      const [pr, tr] = await Promise.allSettled([api({ view: 'players', q: v }), api({ view: 'teams', q: v })]);
-      res.replaceChildren();
-      const ps = pr.status === 'fulfilled' ? pr.value.players : [], ts = tr.status === 'fulfilled' ? tr.value.teams : [];
-      if (!ps.length && !ts.length) res.append(el('div', 'c sm', 'Ei osumia. Kokeile koko nimeä tai liitä Padelution-osoite.'));
-      ps.forEach((p) => { const a = el('a', 'c r'); a.href = 'index.html?p=' + encodeURIComponent(p.url); a.style.cssText = 'margin-top:8px;gap:12px'; const d = el('div'); d.style.flex = 1; d.append(el('div', 'b', p.name), el('div', 'sm', 'Pelaaja')); a.append(d); res.append(a); });
-      ts.forEach((t) => { const a = el('a', 'c r'); a.href = 'sarjapadel.html?team=' + encodeURIComponent(t.url); a.style.cssText = 'margin-top:8px;gap:12px'; const d = el('div'); d.style.flex = 1; d.append(el('div', 'b', t.name), el('div', 'sm', 'Joukkue · ' + t.div + ' · ' + t.group)); a.append(d, el('span', 'b', t.rec)); res.append(a); });
+      const r = await api({ view: 'teams', q: v }); res.replaceChildren();
+      if (!r.teams.length) res.append(el('div', 'c sm', 'Ei osumia. Kokeile toista nimeä tai liitä joukkueen Padelution-osoite.'));
+      r.teams.forEach((t) => { const a = el('a', 'c r'); a.href = 'sarjapadel.html?team=' + encodeURIComponent(t.url); a.style.cssText = 'margin-top:8px;gap:12px'; const d = el('div'); d.style.flex = 1; d.append(el('div', 'b', t.name), el('div', 'sm', t.div + ' · ' + t.group + ' · ' + t.season.replace('kausi-', '').replace('-', '–'))); a.append(d, el('span', 'b', t.rec)); res.append(a); });
     } catch (x) { res.replaceChildren(el('div', 'c err', x.message)); }
   });
 }
@@ -76,7 +72,6 @@ async function pHome(m) {
   const br = await api({ view: 'halli', n: pl.name }).catch(() => ({ leagues: [] }));
   m.replaceChildren();
   m.append(header(pl.name, 'Hei, tervetuloa takaisin', [pl.rank && '#' + pl.rank, pl.rating != null && 'rating ' + pl.rating].filter(Boolean).join(' · ')));
-  search(m, 'Hae pelaaja tai joukkue');
   const nx = h.next, tn = t && t.upcoming && t.upcoming[0];
   const hero = el('a', 'hero'); hero.style.cssText = 'display:block;padding:14px 16px';
   const pathRow = (lbl, x, bg) => { const r = el('div', 'r'); r.style.cssText = 'justify-content:space-between;gap:8px;padding:6px 0;font-size:14px'; r.append(el('b', '', lbl), el('span', '', x ? day(x.date) + ' ' + x.time + ' · ' + x.opp : 'ei tiedossa')); return r; };
