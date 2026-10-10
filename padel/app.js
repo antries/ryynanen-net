@@ -97,7 +97,7 @@ function renderHome(m, d) {
   if (h.warn && h.warn.length) { const w = el('div', 'note', '⚠ Osa tiedoista puuttuu: ' + h.warn.join(' · ')); w.style.cssText = 'background:#FFE3D6;color:#7A2E12;border-radius:12px;padding:8px 12px;margin:8px 0;text-align:left'; m.append(w); }
   const nx = h.next, tn = t && t.upcoming && t.upcoming[0];
   const hero = el('a', 'hero'); hero.style.cssText = 'display:block;padding:14px 16px';
-  const pathRow = (lbl, x, bg) => { const r = el('div', 'r'); r.style.cssText = 'justify-content:space-between;gap:8px;padding:6px 0;font-size:14px'; r.append(el('b', '', lbl), el('span', '', x ? day(x.date) + ' ' + x.time + ' · ' + x.opp : 'ei tiedossa')); return r; };
+  const pathRow = (lbl, x, bg) => { const r = el('div', 'r'); r.style.cssText = 'justify-content:space-between;gap:8px;padding:6px 0;font-size:14px'; r.append(el('b', '', lbl), el('span', '', x ? (x.time ? day(x.date) + ' ' + x.time + ' · ' : '') + x.opp : 'ei tiedossa')); return r; };
   if (nx) {
     hero.href = nx.url; hero.target = '_blank'; hero.rel = 'noopener';
     hero.append(el('div', 'b', 'Seuraava peli'), Object.assign(el('div', 'd', day(nx.date) + (nx.untimed ? ' · aika ei tiedossa' : ' klo ' + nx.time)), { style: 'font-size:20px;font-weight:700' }), Object.assign(el('div', 'd', nx.mine), { style: 'font-size:22px;font-weight:700;line-height:1.1;margin-top:8px' }), Object.assign(el('div', 'd', 'vs ' + nx.opp), { style: 'font-size:17px;margin-top:2px' }));
@@ -172,7 +172,7 @@ function renderTeam(m, t) {
     sec(m, st.group[0] + st.group.slice(1).toLowerCase());
     const c = el('div', 'c'); c.style.padding = '6px 12px'; const tb = el('div'); c.append(tb);
     const draw = (full) => {
-      tb.replaceChildren(); const h = el('div', 'row tbl sm'); ['#', 'Joukkue', 'Pisteet'].forEach((x) => h.append(el('span', '', x))); h.style.borderTop = '0'; tb.append(h);
+      tb.replaceChildren(); const h = el('div', 'row tbl sm'); ['#', 'Joukkue', 'Ottelut'].forEach((x) => h.append(el('span', '', x))); h.style.borderTop = '0'; tb.append(h);
       st.rows.forEach((r) => { const me = r.url === t.url; if (!full && r.rank > 7 && !me) return; const w = el('div', 'row tbl' + (me ? ' me' : '')); [r.rank, r.name, (r.c[0] || '').replace(/\(.*?\)/g, '').replace(/\s/g, '').replace('-', '–')].forEach((x) => w.append(el('span', '', String(x)))); tb.append(w); });
       if (st.rows.length > 7) { const b = el('button', 'pill', full ? 'Näytä vähemmän' : 'Näytä kaikki ' + st.rows.length); b.style.cssText = 'display:block;margin:8px auto;background:none;color:#8A5A00'; b.onclick = () => draw(!full); tb.append(b); }
     };
