@@ -6,14 +6,24 @@ const DP = B + '/users/antti-ryynanen.15459';
 const BOOST = ['boost-league-avoin-fall-edition', 'boost-league-mixty-fall-edition', 'boost-league-senior-fall-edition'];
 const cache = new Map();
 
+const inflight = new Map();
 const get = async (u, ttl = 9e4) => {
   const c = cache.get(u);
   if (c && Date.now() - c.t < ttl) return c.v;
-  const r = await fetch(u, { headers: { 'user-agent': 'padel-dashboard/1.0 (personal use)' } });
-  if (!r.ok) throw new Error(r.status + ' ' + u);
-  const v = await r.text();
-  cache.set(u, { t: Date.now(), v });
-  return v;
+  if (inflight.has(u)) return inflight.get(u);
+  const pr = (async () => {
+    const ac = new AbortController(), to = setTimeout(() => ac.abort(), 8000);
+    try {
+      const r = await fetch(u, { headers: { 'user-agent': 'padel-dashboard/1.0 (personal use)' }, signal: ac.signal });
+      if (!r.ok) throw new Error(r.status + ' ' + u);
+      const v = await r.text();
+      cache.set(u, { t: Date.now(), v });
+      return v;
+    } catch (e) { if (c) return c.v; throw e; } // verkkovirhe: käytä vanhaa kopiota
+    finally { clearTimeout(to); inflight.delete(u); }
+  })();
+  inflight.set(u, pr);
+  return pr;
 };
 const ent = (s) => s.replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&#0?39;/g, "'").replace(/&quot;/g, '"');
 const txt = (h) => ent(h.replace(/<(script|style)[\s\S]*?<\/\1>/g, '').replace(/<[^>]+>/g, '\n')).replace(/[ \t]+/g, ' ').replace(/\s*\n\s*/g, '\n').trim();
@@ -163,40 +173,50 @@ function parseBracket(h) {
 }
 const WDN = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 const wdDate = (start, w) => { for (let k = 0; k < 7; k++) { const d = addDays(start, k); if (new Date(d + 'T12:00:00Z').getUTCDay() === WDN[w]) return d; } return start; };
-async function bracketInfo(ev, id) {
-  const root = ev.url + '/brackets';
-  let h = await get(root);
-  const cls = anchors(h).filter((a) => /\/brackets\/\d+/.test(a.u) && a.t).map((a) => ({ url: abs(a.u).split('#')[0], name: a.t }));
-  let cname = cls[0] ? cls[0].name : '', curl = cls[0] ? cls[0].url : root;
-  if (!h.includes('.' + id)) {
-    h = '';
-    for (const c of cls.slice(0, 8)) { const x = await get(c.url).catch(() => ''); if (x.includes('.' + id)) { h = x; cname = c.name; curl = c.url; break; } }
-    if (!h) return null;
-  }
-  const secs = parseBracket(h), cut = fmt(new Date(Date.now() - 90 * 6e4));
-  const mine = [];
-  secs.forEach((s, si) => s.matches.forEach((m, mi) => { if (m.time && m.p.some((p) => p.ids && p.ids.includes(id))) { const [w, t] = m.time.split(' '); mine.push({ si, mi, m, date: wdDate(ev.date, w), time: t.padStart(5, '0') }); } }));
-  const cur = mine.filter((x) => x.date + 'T' + x.time >= cut).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))[0];
-  if (!cur) return null;
-  const nm = (p) => (p && p.ids ? p.name : p && p.tag === 'BYE' ? 'ei vastustajaa' : 'ei tiedossa');
-  const pair = (m) => m.p.map(nm).join(' – ');
-  const slot = cur.m.p.findIndex((p) => p.ids && p.ids.includes(id)), opp = cur.m.p[1 - slot] || { tag: 'Pending' };
+const byTime = (a, b) => (a.time ? a.date + a.time : '9999' + a.date).localeCompare(b.time ? b.date + b.time : '9999' + b.date);
+const idRe = (id) => new RegExp('/users/[^"\\s]*\\.' + id + '(?!\\d)');
+function analyze(secs, ev, cname, curl, id, cut) {
   const M = secs[0] ? secs[0].matches : [], sizes = [], off = [];
   for (let n = (M.length + 1) / 2, o = 0; n >= 1; n /= 2) { sizes.push(n); off.push(o); o += n; }
-  let r = -1, j = 0;
-  if (cur.si === 0) for (let k = 0; k < sizes.length; k++) if (cur.mi >= off[k] && cur.mi < off[k] + sizes[k]) { r = k; j = cur.mi - off[k]; }
-  const feeder = (k, jj) => (k >= 0 && M[off[k] + jj] ? 'voittaja: ' + pair(M[off[k] + jj]) : 'ei tiedossa');
-  const oppTxt = opp.ids || opp.tag === 'BYE' ? nm(opp) : r > 0 ? feeder(r - 1, 2 * j + (1 - slot)) : 'ei tiedossa';
+  const nm = (p) => (p && p.ids ? p.name : p && p.tag === 'BYE' ? 'ei vastustajaa' : 'ei tiedossa');
+  const pair = (m) => m.p.map(nm).join(' – ');
   const mk = (m, date, time, o) => ({ date, time, court: m.court, opp: o });
-  let win = null, lose = null;
-  if (r >= 0 && r < sizes.length - 1) {
-    const nx = M[off[r + 1] + Math.floor(j / 2)];
-    if (nx && nx.time) { const [w, t] = nx.time.split(' '); const os = nx.p[1 - (j % 2)] || {}; win = mk(nx, wdDate(ev.date, w), t.padStart(5, '0'), os.ids || os.tag === 'BYE' ? nm(os) : feeder(r, 2 * Math.floor(j / 2) + (1 - (j % 2)))); }
-    const pl = secs.slice(1).filter((s) => (r === 0 ? true : /3-4/.test(s.label))).flatMap((s) => s.matches.filter((m) => m.time).map((m) => ({ m, s })));
-    pl.sort((a, b) => a.m.time.localeCompare(b.m.time));
-    if (pl[0]) { const [w, t] = pl[0].m.time.split(' '); lose = { ...mk(pl[0].m, wdDate(ev.date, w), t.padStart(5, '0'), 'ei tiedossa'), label: pl[0].s.label.replace('Places ', 'sijat ') }; }
-  }
-  return { class: cname, url: curl + '#bracket', eventUrl: ev.url, event: ev.title, date: cur.date, time: cur.time, court: cur.m.court, mine: nm(cur.m.p[slot]), opp: oppTxt, win, lose };
+  const mine = [];
+  secs.forEach((sc, si) => sc.matches.forEach((m, mi) => {
+    if (!m.p.some((p) => p.ids && p.ids.includes(id))) return;
+    if (m.time) { const [w, t] = m.time.split(' '); mine.push({ si, mi, m, date: wdDate(ev.date, w), time: t.padStart(5, '0') }); }
+    else if (m.p.length === 2 && !m.p.some((p) => p.tag === 'BYE')) mine.push({ si, mi, m, date: ev.date, time: '' }); // ottelu ilman aikaa
+  }));
+  return mine.filter((x) => !x.time || x.date + 'T' + x.time >= cut).sort(byTime).map((cur) => {
+    const slot = cur.m.p.findIndex((p) => p.ids && p.ids.includes(id)), opp = cur.m.p[1 - slot] || { tag: 'Pending' };
+    let r = -1, j = 0;
+    if (cur.si === 0) for (let k = 0; k < sizes.length; k++) if (cur.mi >= off[k] && cur.mi < off[k] + sizes[k]) { r = k; j = cur.mi - off[k]; }
+    const feeder = (k, jj) => (k >= 0 && M[off[k] + jj] ? 'voittaja: ' + pair(M[off[k] + jj]) : 'ei tiedossa');
+    const oppTxt = opp.ids || opp.tag === 'BYE' ? nm(opp) : r > 0 ? feeder(r - 1, 2 * j + (1 - slot)) : 'ei tiedossa';
+    let win = null, lose = null;
+    if (r >= 0 && r < sizes.length - 1) {
+      const nx = M[off[r + 1] + Math.floor(j / 2)];
+      if (nx && nx.time) { const [w, t] = nx.time.split(' '); const os = nx.p[1 - (j % 2)] || {}; win = mk(nx, wdDate(ev.date, w), t.padStart(5, '0'), os.ids || os.tag === 'BYE' ? nm(os) : feeder(r, 2 * Math.floor(j / 2) + (1 - (j % 2)))); }
+      const pl = secs.slice(1).filter((x) => (r === 0 ? true : /3-4/.test(x.label))).flatMap((x) => x.matches.filter((m) => m.time).map((m) => ({ m, s: x })));
+      pl.sort((a, b) => a.m.time.localeCompare(b.m.time));
+      if (pl[0]) { const [w, t] = pl[0].m.time.split(' '); lose = { ...mk(pl[0].m, wdDate(ev.date, w), t.padStart(5, '0'), 'ei tiedossa'), label: pl[0].s.label.replace('Places ', 'sijat ') }; }
+    }
+    return { class: cname, url: curl, eventUrl: ev.url, event: ev.title, date: cur.date, time: cur.time, untimed: !cur.time, court: cur.m.court, mine: nm(cur.m.p[slot]), opp: oppTxt, win, lose };
+  });
+}
+async function bracketsFor(ev, id, warn) {
+  const h0 = await get(ev.url + '/brackets');
+  let cls = [...new Map(anchors(h0).filter((a) => /\/brackets\/\d+/.test(a.u) && a.t).map((a) => { const u = abs(a.u).split('#')[0]; return [u, { url: u, name: a.t }]; })).values()];
+  if (!cls.length) cls = [{ url: ev.url + '/brackets', name: '' }];
+  const cut = fmt(new Date(Date.now() - 90 * 6e4)), re = idRe(id);
+  const out = await Promise.all(cls.slice(0, 14).map(async (c) => {
+    const h = await get(c.url).catch(() => '');
+    if (!re.test(h)) return [];
+    const secs = parseBracket(h);
+    if (!secs.length) { warn.push('Kaavion luku epäonnistui: ' + ev.title + (c.name ? ' / ' + c.name : '')); return []; }
+    return analyze(secs, ev, c.name, c.url + '#bracket', id, cut);
+  }));
+  return out.flat();
 }
 
 // ---------- etusivu: pelaajan profiili ----------
@@ -217,7 +237,7 @@ async function timetable(ev, sur) {
   });
   return out;
 }
-async function home(p, dbg) {
+async function profile(p, dbg) {
   const h = await get(p);
   if (dbg) return txt(h).slice(0, 8000);
   const t = flat(h);
@@ -250,23 +270,59 @@ async function home(p, dbg) {
     const nm = (arr) => arr.map((x) => x.name).join(' / ');
     return { title: a.t, url: abs(a.u), opp: nm(tm === 2 ? pl.slice(0, 2) : pl.slice(2)), score, win };
   }).slice(0, 12);
-  const lim = new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10), cut = fmt(new Date(Date.now() - 90 * 6e4));
-  const upcoming = (await Promise.all(events.filter((e) => e.date >= lim).slice(0, 3).map((e) => timetable(e, sur))))
-    .flat().filter((m) => m.date + 'T' + m.time >= cut).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-  let next = null;
-  for (const e of events.filter((x) => x.date >= lim).slice(0, 3)) { try { next = await bracketInfo(e, id); } catch {} if (next) break; }
-  return { player, upcoming, recent, events: events.slice(0, 10), leagues, next, fetchedAt: new Date().toISOString() };
+  return { player, id, sur, recent, events, leagues };
+}
+async function matchesFor(prof, tt) {
+  const lim = new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10), soon = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
+  const evs = prof.events.filter((e) => e.date >= lim && e.date <= soon).slice(0, 4);
+  const warn = [];
+  const [br, tts] = await Promise.all([
+    Promise.allSettled(evs.map((e) => bracketsFor(e, prof.id, warn))),
+    tt ? Promise.all(evs.map((e) => timetable(e, prof.sur))) : Promise.resolve([]),
+  ]);
+  br.forEach((r, i) => { if (r.status === 'rejected') warn.push('Tapahtuman haku epäonnistui: ' + evs[i].title); });
+  const list = br.flatMap((r) => (r.status === 'fulfilled' ? r.value : [])).sort(byTime);
+  const cut = fmt(new Date(Date.now() - 90 * 6e4));
+  const upcoming = tts.flat().filter((m) => m.date + 'T' + m.time >= cut).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  return { next: list[0] || null, later: list.slice(1, 5), upcoming, warn };
+}
+const shape = (prof, x) => ({ player: prof.player, recent: prof.recent, events: prof.events.slice(0, 10), leagues: prof.leagues, next: null, later: [], upcoming: [], warn: [], ...x, fetchedAt: new Date().toISOString() });
+async function home(p, dbg, tt) {
+  const prof = await profile(p, dbg);
+  if (typeof prof === 'string') return prof;
+  return shape(prof, await matchesFor(prof, tt));
+}
+// yksi kutsu hakee kaiken rinnakkain
+async function dash(q) {
+  const p = norm(q.get('p') || DP);
+  if (!p.startsWith(B + '/users/')) throw new Error('Anna Padelution-profiilin osoite.');
+  const parts = (q.get('parts') || 'home,team,naficon,halli').split(','), url = q.get('url') || '', tt = q.has('tt');
+  const prof = await profile(p);
+  const [hm, tm, nf, hl] = await Promise.allSettled([
+    parts.includes('home') ? matchesFor(prof, tt) : Promise.resolve({}),
+    parts.includes('team') && url ? team(url) : Promise.resolve(null),
+    parts.includes('naficon') ? naficon() : Promise.resolve(null),
+    parts.includes('halli') ? halli(prof.player.name) : Promise.resolve(null),
+  ]);
+  const ok = (r) => (r.status === 'fulfilled' ? r.value : null);
+  const home = shape(prof, ok(hm) || {});
+  const names = ['Ottelut', 'Sarjapadel', 'Naficon', 'Boost-liiga'];
+  [hm, tm, nf, hl].forEach((r, i) => { if (r.status === 'rejected') home.warn.push(names[i] + ': haku epäonnistui'); });
+  if (!prof.player.name || (!prof.recent.length && !prof.events.length)) home.warn.push('Profiilin tietoja ei löytynyt – Padelutionin sivu on voinut muuttua');
+  return { home, team: ok(tm), naficon: ok(nf), halli: ok(hl), fetchedAt: new Date().toISOString() };
 }
 
 export default async (req) => {
   const q = new URL(req.url).searchParams, v = q.get('view') || 'home', dbg = q.has('debug');
-  const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+  const fresh = q.has('r') || dbg;
+  const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: s === 200 && !fresh ? { 'content-type': 'application/json', 'cache-control': 'public, max-age=0, must-revalidate', 'netlify-cdn-cache-control': 'public, s-maxage=45, stale-while-revalidate=300' } : { 'content-type': 'application/json', 'cache-control': 'no-store' } });
   try {
     let d;
-    if (v === 'home') {
+    if (v === 'dash') d = await dash(q);
+    else if (v === 'home') {
       const p = norm(q.get('p') || DP);
       if (!p.startsWith(B + '/users/')) throw new Error('Anna Padelution-profiilin osoite.');
-      d = await home(p, dbg);
+      d = await home(p, dbg, q.has('tt'));
     } else if (v === 'team') d = await team(q.get('url') || '', dbg);
     else if (v === 'teams') {
       const s = (q.get('q') || '').toLowerCase().replace(/\s+/g, ' ').trim();
