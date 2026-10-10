@@ -7,7 +7,17 @@ const T = qs.get('team') || LS.padelT || DT;
 const $ = (s) => document.querySelector(s);
 const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
 const link = (x, u, c) => { const a = el('a', c, x); a.href = u; a.target = '_blank'; a.rel = 'noopener'; return a; };
-const api = async (q) => { const r = await fetch(API + '?' + new URLSearchParams(q)); const d = await r.json(); if (d.error) throw new Error(d.error); return d; };
+let FRESH = false; try { FRESH = sessionStorage.padelFresh === '1'; sessionStorage.removeItem('padelFresh'); } catch {}
+const api = async (q) => { const r = await fetch(API + '?' + new URLSearchParams(FRESH ? { ...q, r: Date.now() } : q)); const d = await r.json(); if (d.error) throw new Error(d.error); return d; };
+// näytä edellinen tulos heti, päivitä taustalla
+const lsGet = (k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+async function swr(key, fetcher, render, m) {
+  const c = lsGet('padelC:' + key); let had = false;
+  if (c) { try { render(c.d); had = true; } catch {} }
+  try { const d = await fetcher(); lsSet('padelC:' + key, { d }); render(d); }
+  catch (e) { if (!had) err(m, e); }
+}
 const WD = ['Su', 'Ma', 'Ti', 'Ke', 'To', 'Pe', 'La'];
 const day = (d) => { const x = new Date(d + 'T12:00:00'); return WD[x.getDay()] + ' ' + x.getDate() + '.' + (x.getMonth() + 1) + '.'; };
 const short = (d) => { const x = new Date(d + 'T12:00:00'); return x.getDate() + '.' + (x.getMonth() + 1) + '.'; };
@@ -25,7 +35,7 @@ const header = (title, sub, chip) => {
   if (sub) d.append(el('div', 'sm', sub));
   d.append(el('h1', '', title));
   if (chip) d.append(Object.assign(el('span', 'pill', chip), { style: 'background:#FFE08A;margin-top:8px' }));
-  const b = el('button', 'ib'); b.setAttribute('aria-label', 'Päivitä'); b.onclick = () => location.reload();
+  const b = el('button', 'ib'); b.setAttribute('aria-label', 'Päivitä'); b.onclick = () => { try { sessionStorage.padelFresh = '1'; } catch {} location.reload(); };
   b.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#33291C" stroke-width="2.2" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v5h-5"/></svg>';
   h.append(d, b); return h;
 };
@@ -65,19 +75,32 @@ const nextNaf = (n) => {
 };
 
 /* ---------- etusivu ---------- */
-async function pHome(m) {
-  const [hr, tr, nr] = await Promise.allSettled([api({ view: 'home', p: P }), api({ view: 'team', url: T }), api({ view: 'naficon' })]);
-  if (hr.status === 'rejected') return err(m, hr.reason);
-  const h = hr.value, t = tr.value, n = nr.value, pl = h.player;
-  const br = await api({ view: 'halli', n: pl.name }).catch(() => ({ leagues: [] }));
+const pHome = (m) => swr('home:' + P + '|' + T, () => api({ view: 'dash', p: P, url: T }), (d) => renderHome(m, d), m);
+function ratingChart(m, pl) {
+  if (pl.rating == null) return;
+  const k = 'padelH:' + pl.id, iso = new Date().toISOString().slice(0, 10);
+  let hs = lsGet(k) || []; const last = hs[hs.length - 1];
+  if (!last || last.d !== iso) hs.push({ d: iso, r: pl.rating, k: pl.rank }); else { last.r = pl.rating; last.k = pl.rank; }
+  hs = hs.slice(-120); lsSet(k, hs);
+  if (hs.length < 2) return;
+  sec(m, 'Rating-kehitys');
+  const W = 300, H = 70, rs = hs.map((x) => x.r), lo = Math.min(...rs), hi = Math.max(...rs), sp = hi - lo || 1;
+  const pts = hs.map((x, i) => (6 + (W - 12) * i / (hs.length - 1)).toFixed(1) + ',' + (H - 8 - (H - 16) * (x.r - lo) / sp).toFixed(1)).join(' ');
+  const c = el('div', 'c'); c.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Rating-kehitys"><polyline fill="none" stroke="#E8A317" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="' + pts + '"/></svg>';
+  c.append(el('div', 'sm', hs[0].r + ' → ' + hs[hs.length - 1].r + ' · ' + hs.length + ' mittauskertaa tällä laitteella'));
+  m.append(c);
+}
+function renderHome(m, d) {
+  const h = d.home, t = d.team, n = d.naficon, br = d.halli || { leagues: [] }, pl = h.player;
   m.replaceChildren();
   m.append(header(pl.name, 'Hei, tervetuloa takaisin', [pl.rank && '#' + pl.rank, pl.rating != null && 'rating ' + pl.rating].filter(Boolean).join(' · ')));
+  if (h.warn && h.warn.length) { const w = el('div', 'note', '⚠ Osa tiedoista puuttuu: ' + h.warn.join(' · ')); w.style.cssText = 'background:#FFE3D6;color:#7A2E12;border-radius:12px;padding:8px 12px;margin:8px 0;text-align:left'; m.append(w); }
   const nx = h.next, tn = t && t.upcoming && t.upcoming[0];
   const hero = el('a', 'hero'); hero.style.cssText = 'display:block;padding:14px 16px';
   const pathRow = (lbl, x, bg) => { const r = el('div', 'r'); r.style.cssText = 'justify-content:space-between;gap:8px;padding:6px 0;font-size:14px'; r.append(el('b', '', lbl), el('span', '', x ? day(x.date) + ' ' + x.time + ' · ' + x.opp : 'ei tiedossa')); return r; };
   if (nx) {
     hero.href = nx.url; hero.target = '_blank'; hero.rel = 'noopener';
-    hero.append(el('div', 'b', 'Seuraava peli'), Object.assign(el('div', 'd', day(nx.date) + ' klo ' + nx.time), { style: 'font-size:20px;font-weight:700' }), Object.assign(el('div', 'd', nx.mine), { style: 'font-size:22px;font-weight:700;line-height:1.1;margin-top:8px' }), Object.assign(el('div', 'd', 'vs ' + nx.opp), { style: 'font-size:17px;margin-top:2px' }));
+    hero.append(el('div', 'b', 'Seuraava peli'), Object.assign(el('div', 'd', day(nx.date) + (nx.untimed ? ' · aika ei tiedossa' : ' klo ' + nx.time)), { style: 'font-size:20px;font-weight:700' }), Object.assign(el('div', 'd', nx.mine), { style: 'font-size:22px;font-weight:700;line-height:1.1;margin-top:8px' }), Object.assign(el('div', 'd', 'vs ' + nx.opp), { style: 'font-size:17px;margin-top:2px' }));
     const ch = el('div', 'r'); ch.style.cssText = 'gap:6px;margin-top:10px;flex-wrap:wrap';
     if (nx.court) ch.append(el('span', 'pill', 'Kenttä ' + court(nx.court))); ch.append(el('span', 'pill', nx.class));
     hero.append(ch);
@@ -91,6 +114,11 @@ async function pHome(m) {
     if (tn.court) hero.append(Object.assign(el('span', 'pill', 'Kenttä ' + tn.court), { style: 'margin-top:8px' }));
   } else hero.append(el('div', 'b', 'Seuraava peli'), el('div', 'd t1', 'Ei tiedossa'));
   m.append(hero);
+  (h.later || []).forEach((x) => {
+    const c = el('a', 'c'); c.href = x.url; c.target = '_blank'; c.rel = 'noopener'; c.style.cssText = 'display:flex;gap:12px;align-items:baseline;margin-top:10px;padding:10px 14px';
+    const w = el('div'); w.style.flex = 1; w.append(el('div', 'b', x.mine + ' vs ' + x.opp), el('div', 'sm', x.class + (x.court ? ' · kenttä ' + court(x.court) : '')));
+    c.append(Object.assign(el('span', 'd b', day(x.date) + (x.untimed ? ' · aika ei tiedossa' : ' ' + x.time)), { style: 'font-size:15px;white-space:nowrap' }), w); m.append(c);
+  });
 
   sec(m, 'Seuraavat');
   const items = [];
@@ -103,12 +131,13 @@ async function pHome(m) {
 
   sec(m, 'Viimeksi pelatut');
   h.recent.slice(0, 3).forEach((r) => { const c = dotRow(r.win, r.opp || '?', r.title, r.score.replace(/\s*\|\s*/g, ' · ')); c.style.cursor = 'pointer'; c.onclick = () => window.open(r.url, '_blank'); m.append(c); });
+  ratingChart(m, pl);
   m.append(el('div', 'note', 'Päivitetty ' + new Date(h.fetchedAt).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })));
 }
 
 /* ---------- sarjapadel ---------- */
-async function pTeam(m) {
-  let t; try { t = await api({ view: 'team', url: T }); } catch (e) { return err(m, e); }
+const pTeam = (m) => swr('team:' + T, () => api({ view: 'team', url: T }), (d) => { const i = m.querySelector('input'); if (i && i.value) return; renderTeam(m, d); }, m);
+function renderTeam(m, t) {
   m.replaceChildren();
   m.append(header('Sarjapadel', t.season.replace('kausi-', 'Kausi ').replace('-', '–')));
   search(m, 'Hae joukkue, esim. Boost');
@@ -143,8 +172,8 @@ async function pTeam(m) {
     sec(m, st.group[0] + st.group.slice(1).toLowerCase());
     const c = el('div', 'c'); c.style.padding = '6px 12px'; const tb = el('div'); c.append(tb);
     const draw = (full) => {
-      tb.replaceChildren(); const h = el('div', 'row sm'); ['#', 'Joukkue', 'Ottelut', 'P'].forEach((x) => h.append(el('span', '', x))); h.style.borderTop = '0'; tb.append(h);
-      st.rows.forEach((r) => { const me = r.url === t.url; if (!full && r.rank > 7 && !me) return; const w = el('div', 'row' + (me ? ' me' : '')); [r.rank, r.name, (r.c[0] || '').replace(/\s/g, '').replace('-', '–'), r.c[1]].forEach((x) => w.append(el('span', '', String(x)))); tb.append(w); });
+      tb.replaceChildren(); const h = el('div', 'row tbl sm'); ['#', 'Joukkue', 'Pisteet'].forEach((x) => h.append(el('span', '', x))); h.style.borderTop = '0'; tb.append(h);
+      st.rows.forEach((r) => { const me = r.url === t.url; if (!full && r.rank > 7 && !me) return; const w = el('div', 'row tbl' + (me ? ' me' : '')); [r.rank, r.name, (r.c[0] || '').replace(/\(.*?\)/g, '').replace(/\s/g, '').replace('-', '–')].forEach((x) => w.append(el('span', '', String(x)))); tb.append(w); });
       if (st.rows.length > 7) { const b = el('button', 'pill', full ? 'Näytä vähemmän' : 'Näytä kaikki ' + st.rows.length); b.style.cssText = 'display:block;margin:8px auto;background:none;color:#8A5A00'; b.onclick = () => draw(!full); tb.append(b); }
     };
     draw(false); m.append(c);
@@ -158,7 +187,7 @@ async function pTeam(m) {
 
 /* ---------- turnaukset ---------- */
 async function pEvents(m) {
-  let h; try { h = await api({ view: 'home', p: P }); } catch (e) { return err(m, e); }
+  let h; try { h = await api({ view: 'home', p: P, tt: 1 }); } catch (e) { return err(m, e); }
   m.replaceChildren(); m.append(header('Turnaukset', h.player.name));
   const up = h.events.filter((e) => e.date >= today()).reverse(), past = h.events.filter((e) => e.date < today());
   sec(m, 'Tulevat');
@@ -170,7 +199,7 @@ async function pEvents(m) {
 
 /* ---------- halli ---------- */
 async function pHalli(m) {
-  let h, b; try { h = await api({ view: 'home', p: P }); b = await api({ view: 'halli', n: h.player.name }); } catch (e) { return err(m, e); }
+  let h, b; try { const d = await api({ view: 'dash', p: P, parts: 'halli' }); h = d.home; b = d.halli; if (!b) throw new Error('Boost-liigan haku epäonnistui'); } catch (e) { return err(m, e); }
   m.replaceChildren(); m.append(header('Halliliigat', 'Boost Padel League'));
   if (!b.leagues.length) m.append(el('div', 'c sm', 'Pelaajaa ei löytynyt Boost-liigan lohkoista.'));
   b.leagues.forEach((l) => {
@@ -183,7 +212,7 @@ async function pHalli(m) {
 
 /* ---------- naficon ---------- */
 async function pNaf(m) {
-  let h, n; try { [h, n] = await Promise.all([api({ view: 'home', p: P }), api({ view: 'naficon' })]); } catch (e) { return err(m, e); }
+  let h, n; try { const d = await api({ view: 'dash', p: P, parts: 'naficon' }); h = d.home; n = d.naficon; if (!n) throw new Error('Naficon-haku epäonnistui'); } catch (e) { return err(m, e); }
   m.replaceChildren(); m.append(header('Naficon Liiga', 'Naficon Arena'));
   sec(m, 'Pelipäivät ' + n.label); const nx = nextNaf(n);
   n.days.forEach((d) => { const c = el('div', 'c r'); c.style.justifyContent = 'space-between'; if (nx && nx.n === d.n) c.style.border = '3px solid var(--sun)'; c.append(el('span', 'b', 'Kierros ' + d.n), el('span', '', d.days)); m.append(c); });
