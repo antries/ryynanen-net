@@ -185,7 +185,6 @@ function analyze(secs, ev, cname, curl, id, cut) {
   secs.forEach((sc, si) => sc.matches.forEach((m, mi) => {
     if (!m.p.some((p) => p.ids && p.ids.includes(id))) return;
     if (m.time) { const [w, t] = m.time.split(' '); mine.push({ si, mi, m, date: wdDate(ev.date, w), time: t.padStart(5, '0') }); }
-    else if (m.p.length === 2 && !m.p.some((p) => p.tag === 'BYE')) mine.push({ si, mi, m, date: ev.date, time: '' }); // ottelu ilman aikaa
   }));
   return mine.filter((x) => !x.time || x.date + 'T' + x.time >= cut).sort(byTime).map((cur) => {
     const slot = cur.m.p.findIndex((p) => p.ids && p.ids.includes(id)), opp = cur.m.p[1 - slot] || { tag: 'Pending' };
@@ -197,9 +196,14 @@ function analyze(secs, ev, cname, curl, id, cut) {
     if (r >= 0 && r < sizes.length - 1) {
       const nx = M[off[r + 1] + Math.floor(j / 2)];
       if (nx && nx.time) { const [w, t] = nx.time.split(' '); const os = nx.p[1 - (j % 2)] || {}; win = mk(nx, wdDate(ev.date, w), t.padStart(5, '0'), os.ids || os.tag === 'BYE' ? nm(os) : feeder(r, 2 * Math.floor(j / 2) + (1 - (j % 2)))); }
-      const pl = secs.slice(1).filter((x) => (r === 0 ? true : /3-4/.test(x.label))).flatMap((x) => x.matches.filter((m) => m.time).map((m) => ({ m, s: x })));
-      pl.sort((a, b) => a.m.time.localeCompare(b.m.time));
-      if (pl[0]) { const [w, t] = pl[0].m.time.split(' '); lose = { ...mk(pl[0].m, wdDate(ev.date, w), t.padStart(5, '0'), 'ei tiedossa'), label: pl[0].s.label.replace('Places ', 'sijat ') }; }
+      // häviäjä siirtyy sijoituskaavion ottelun r-kierroksen häviäjien osioon: vastustajana sisarottelun häviäjä
+      const sib = M[off[r] + (j ^ 1)], sibLoser = sib ? 'häviäjä: ' + pair(sib) : 'ei tiedossa';
+      const sc = secs.slice(1).find((x) => { const mm = x.label.match(/(\d+)-(\d+)/); return mm && +mm[2] - +mm[1] + 1 === sizes[r]; });
+      if (sc) {
+        const pm = sc.matches[Math.floor(j / 2)], label = sc.label.replace('Places ', 'sijat ');
+        if (pm && pm.time) { const [w, t] = pm.time.split(' '); lose = { ...mk(pm, wdDate(ev.date, w), t.padStart(5, '0'), sibLoser), label }; }
+        else lose = { date: '', time: '', court: '', opp: sibLoser, label };
+      }
     }
     return { class: cname, url: curl, eventUrl: ev.url, event: ev.title, date: cur.date, time: cur.time, untimed: !cur.time, court: cur.m.court, mine: nm(cur.m.p[slot]), opp: oppTxt, win, lose };
   });
