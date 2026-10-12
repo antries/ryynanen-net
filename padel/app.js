@@ -93,7 +93,7 @@ function ratingChart(m, pl) {
 function renderHome(m, d) {
   const h = d.home, t = d.team, n = d.naficon, br = d.halli || { leagues: [] }, pl = h.player;
   m.replaceChildren();
-  m.append(header(pl.name, 'Hei, tervetuloa takaisin', [pl.rank && '#' + pl.rank, pl.rating != null && 'rating ' + pl.rating].filter(Boolean).join(' · ')));
+  m.append(header(pl.name, 'Padelboard', [pl.rating != null && 'rating ' + pl.rating, pl.rankPts && String(pl.rankPts).replace('.', ',') + ' p'].filter(Boolean).join(' · ')));
   if (h.warn && h.warn.length) { const w = el('div', 'note', '⚠ Osa tiedoista puuttuu: ' + h.warn.join(' · ')); w.style.cssText = 'background:#FFE3D6;color:#7A2E12;border-radius:12px;padding:8px 12px;margin:8px 0;text-align:left'; m.append(w); }
   const nx = h.next, tn = t && t.upcoming && t.upcoming[0];
   const hero = el('a', 'hero'); hero.style.cssText = 'display:block;padding:14px 16px';
@@ -131,7 +131,6 @@ function renderHome(m, d) {
 
   sec(m, 'Viimeksi pelatut');
   h.recent.slice(0, 3).forEach((r) => { const c = dotRow(r.win, r.opp || '?', r.title, r.score.replace(/\s*\|\s*/g, ' · ')); c.style.cursor = 'pointer'; c.onclick = () => window.open(r.url, '_blank'); m.append(c); });
-  ratingChart(m, pl);
   m.append(el('div', 'note', 'Päivitetty ' + new Date(h.fetchedAt).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })));
 }
 
@@ -148,7 +147,7 @@ function renderTeam(m, t) {
   m.append(pr);
   const hero = el('div', 'hero'); hero.append(el('div', 'd', own), Object.assign(el('div', '', t.division[0].toUpperCase() + t.division.slice(1) + (st ? ' · ' + st.group.toLowerCase() + ' · ' + st.size + ' joukkuetta' : '')), { style: 'color:#5C4B2E' }));
   hero.firstChild.style.cssText = 'font-size:30px;font-weight:700;line-height:1.1';
-  if (st) { const r = el('div', 'r'); r.style.cssText = 'gap:10px;margin-top:14px'; [['Sija', st.rank + '.'], ['Ottelut', st.rec.replace(/\s/g, '').replace('-', '–')], ['Pisteet', st.pts]].forEach(([a, b]) => { const s = el('div', 'stat'); s.append(el('div', 'sm', a), el('div', 'd', b)); r.append(s); }); hero.append(r); }
+  if (st) { const r = el('div', 'r'); r.style.cssText = 'gap:10px;margin-top:14px'; [['Sija', st.rank + '.'], ['Ottelut', (st.rec || '').replace(/\s/g, '').replace('-', '–')], ['Pisteet', st.pts]].forEach(([a, b]) => { const s = el('div', 'stat'); s.append(el('div', 'sm', a), el('div', 'd', b)); r.append(s); }); hero.append(r); }
   m.append(hero);
   sec(m, 'Kierrokset');
   const all = [...t.played, ...t.upcoming]; let nextDone = false;
@@ -173,7 +172,7 @@ function renderTeam(m, t) {
     const c = el('div', 'c'); c.style.padding = '6px 12px'; const tb = el('div'); c.append(tb);
     const draw = (full) => {
       tb.replaceChildren(); const h = el('div', 'row tbl sm'); ['#', 'Joukkue', 'Ottelut'].forEach((x) => h.append(el('span', '', x))); h.style.borderTop = '0'; tb.append(h);
-      st.rows.forEach((r) => { const me = r.url === t.url; if (!full && r.rank > 7 && !me) return; const w = el('div', 'row tbl' + (me ? ' me' : '')); [r.rank, r.name, (r.c[0] || '').replace(/\(.*?\)/g, '').replace(/\s/g, '').replace('-', '–')].forEach((x) => w.append(el('span', '', String(x)))); tb.append(w); });
+      st.rows.forEach((r) => { const me = r.url === t.url; if (!full && r.rank > 7 && !me) return; const w = el('div', 'row tbl' + (me ? ' me' : '')); [r.rank, r.name, (r.mt || r.c[0] || '').replace('-', '–')].forEach((x) => w.append(el('span', '', String(x)))); tb.append(w); });
       if (st.rows.length > 7) { const b = el('button', 'pill', full ? 'Näytä vähemmän' : 'Näytä kaikki ' + st.rows.length); b.style.cssText = 'display:block;margin:8px auto;background:none;color:#8A5A00'; b.onclick = () => draw(!full); tb.append(b); }
     };
     draw(false); m.append(c);
