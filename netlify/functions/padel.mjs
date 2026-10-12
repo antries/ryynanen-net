@@ -49,12 +49,13 @@ const isoDM = (dd, mm) => {
 function groups(h) {
   return h.split('<table').slice(1).map((p) => {
     const trs = p.split('<tr').slice(1);
-    const name = flat('<tr' + (trs[0] || '')).replace(/\s*(Matches|M)\s+(P|W).*$/, '').trim();
+    const name = flat('<tr' + (trs[0] || '')).replace(/\s+(?:[Ww]\s*-\s*[Ll]|Matches|M)\s+.*$/, '').trim();
     const rows = trs.slice(1).map((r) => {
       const c = [...r.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((m) => flat(m[1]));
       if (!c.length) return null;
       const a = r.match(/<a[^>]+href="([^"]*\/rosters\/\d+)"/);
-      return { url: a ? abs(a[1]) : '', name: c[0], c: c.slice(1) };
+      const mt = (c.find((x, i) => i > 0 && /^\d+\s*-\s*\d+\s*\(-?\d+\)\s*$/.test(x)) || '').replace(/\s*\(.*$/, '').replace(/\s/g, '');
+      return { url: a ? abs(a[1]) : '', name: c[0], c: c.slice(1), mt, pt: c.length > 1 ? c[c.length - 1] : '' };
     }).filter(Boolean);
     rows.forEach((r, i) => (r.rank = i + 1));
     const L = txt((p.split('</table>')[1] || '')).split('\n'), rounds = [];
@@ -102,7 +103,7 @@ async function team(url, dbg) {
   try {
     for (const g of groups(await get(divUrl, 3e5))) {
       const r = g.rows.find((x) => x.url === url);
-      if (r) standing = { group: g.name, rank: r.rank, size: g.rows.length, rec: r.c[0], pts: r.c[1], rows: g.rows, rounds: g.rounds };
+      if (r) standing = { group: g.name, rank: r.rank, size: g.rows.length, rec: r.mt || r.c[0], pts: r.pt || r.c[1], rows: g.rows, rounds: g.rounds };
     }
   } catch {}
   return { name, url, division: decodeURIComponent(divUrl.split('/').pop()), season: divUrl.split('/').slice(-2)[0], players, played, upcoming, standing };
@@ -115,7 +116,7 @@ async function teamIndex() {
       const divs = [...new Set(anchors(h0).map((a) => abs(a.u).split('#')[0]).filter((u) => u.startsWith(base + '/') && !u.slice(base.length + 1).includes('/')))];
       await Promise.all(divs.map(async (u) => {
         const dv = decodeURIComponent(u.split('/').pop());
-        groups(await get(u, 6 * 36e5).catch(() => '')).forEach((g) => g.rows.forEach((r) => r.url && out.set(r.url, { name: r.name, url: r.url, season: s, div: dv, group: g.name, rec: r.c[0], pts: r.c[1] })));
+        groups(await get(u, 6 * 36e5).catch(() => '')).forEach((g) => g.rows.forEach((r) => r.url && out.set(r.url, { name: r.name, url: r.url, season: s, div: dv, group: g.name, rec: r.mt || r.c[0], pts: r.pt || r.c[1] })));
       }));
     } catch {}
   }));
@@ -331,6 +332,10 @@ export default async (req) => {
     else if (v === 'teams') {
       const s = (q.get('q') || '').toLowerCase().replace(/\s+/g, ' ').trim();
       d = { teams: s ? (await teamIndex()).filter((t) => t.name.toLowerCase().includes(s)).slice(0, 30) : [] };
+    } else if (v === 'rankdbg') {
+      const h = await get(norm(q.get('p') || DP), 0), out = [];
+      for (const m of h.matchAll(/Ranking\s*(pisteet|laskenta)|ranking/gi)) out.push(h.slice(Math.max(0, m.index - 300), m.index + 500).replace(/\s+/g, ' '));
+      d = [...new Set(out)].slice(0, 12).join('\n\n-----\n\n') + '\n\nLINKS: ' + [...h.matchAll(/(?:href|data-[\w-]+|hx-get|action)="([^"]*(?:rank|point|pist)[^"]*)"/gi)].map((m) => m[1]).join(' | ');
     } else if (v === 'halli') d = await halli(q.get('n') || '');
     else if (v === 'naficon') d = await naficon();
     else throw new Error('Tuntematon näkymä');
